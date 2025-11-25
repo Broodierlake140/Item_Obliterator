@@ -67,7 +67,10 @@ public class Utils {
     // Emi compat stuff
     public static boolean isDisabled(EmiStack emiStack) {
         if (emiStack == null) return false;
-    
+
+        //following two lines accounts for custom  non item entries for the mod emi loot and anything similiar
+        Object key = emiStack.getKey();
+        if (!(key instanceof net.minecraft.item.Item)) return false;
         if (emiStack.hasNbt() && isDisabled(emiStack.getNbt())) return true;
     
         if (emiStack.getKey() instanceof Item item) {
