@@ -1,151 +1,58 @@
-package elocindev.item_obliterator.fabric_quilt.util;
+package elocindev.item_obliterator.fabric_quilt;
 
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import dev.emi.emi.api.stack.EmiStack;
-import elocindev.item_obliterator.fabric_quilt.ItemObliterator;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
+import dev.emi.emi.api.EmiApi;
 
-public class Utils {
-    public static String getItemId(Item item) {
-        return Registries.ITEM.getId(item).toString();
-    }  
 
-    public static boolean shouldRecipeBeDisabled(Item item) {
-        return shouldRecipeBeDisabled(getItemId(item));
-    }
+import java.util.HashSet;
+import java.util.Set;
 
-    public static boolean shouldRecipeBeDisabled(String itemid) {
-        if (isDisabled(itemid)) return true;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-        if (!ItemObliterator.Config.use_hashmap_optimizations) {
-            for (String blacklisted_id : ItemObliterator.Config.only_disable_recipes) {
-                if (blacklisted_id == null) continue;
-                if (blacklisted_id.startsWith("//")) continue;
-                
-                if (blacklisted_id.equals(itemid)) return true;
+import elocindev.item_obliterator.fabric_quilt.config.ConfigEntries;
+import elocindev.item_obliterator.fabric_quilt.plugin.FDCompatibility;
+import elocindev.necronomicon.api.config.v1.NecConfigAPI;
 
-                if (blacklisted_id.startsWith("!")) {
-                    blacklisted_id = blacklisted_id.substring(1);
+public class ItemObliterator implements ModInitializer {
+	public static final String MODID = "item_obliterator";
+	public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
+	
+	public static ConfigEntries Config = ConfigEntries.INSTANCE;
 
-                    if (itemid.matches(blacklisted_id)) return true;
-                }
-            }
-        } else {
-            if (ItemObliterator.only_disable_recipes.contains(itemid)) return true;
-        }
+	public static Set<String> blacklisted_items;
+	public static Set<String> blacklisted_nbt;
+	public static Set<String> only_disable_interactions;
+	public static Set<String> only_disable_attacks;
+    public static Set<String> only_disable_recipes;
 
-        return false;
-    }
+	@Override
+	public void onInitialize() {
+		NecConfigAPI.registerConfig(ConfigEntries.class);
+			Config = ConfigEntries.INSTANCE;
+			
+			if (ItemObliterator.Config.use_hashmap_optimizations)
+            	ItemObliterator.reloadConfigHashsets();
 
-    public static boolean isDisabled(String itemid) {
-        if (itemid.equals("minecraft:air")) return false;
+		ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
+			NecConfigAPI.registerConfig(ConfigEntries.class);
+			Config = ConfigEntries.INSTANCE;
+			
+			if (ItemObliterator.Config.use_hashmap_optimizations)
+            	ItemObliterator.reloadConfigHashsets();
+		});
+	
+		LOGGER.info("Item Obliterator Config Loaded");
+		FDCompatibility.init();
+	}
 
-        if (!ItemObliterator.Config.use_hashmap_optimizations) {
-            for (String blacklisted_id : ItemObliterator.Config.blacklisted_items) {
-                if (blacklisted_id == null) continue;
-
-                if (blacklisted_id.startsWith("//")) continue;
-                
-                if (blacklisted_id.equals(itemid)) return true;
-
-                if (blacklisted_id.startsWith("!")) {
-                    blacklisted_id = blacklisted_id.substring(1);
-
-                    if (itemid.matches(blacklisted_id)) return true;
-                }
-            }
-        } else {
-            if (ItemObliterator.blacklisted_items.contains(itemid)) return true;
-        }
-
-        return false;
-    }
-
-    // Emi compat stuff
-    public static boolean isDisabled(EmiStack emiStack) {
-        if (emiStack == null) return false;
-    
-        if (emiStack.hasNbt() && isDisabled(emiStack.getNbt())) return true;
-    
-        if (emiStack.getKey() instanceof Item item) {
-            return isDisabled(getItemId(item));
-        }
-    
-        return false;
-    }
-    
-
-    public static boolean isDisabled(ItemStack stack) {
-        if (stack == null || stack.isOf(Items.AIR)) return false;
-
-        if (stack.hasNbt()) {
-            isDisabled(stack.getNbt());
-        }
-        
-        return isDisabled(getItemId(stack.getItem()));
-    }
-
-    public static boolean isDisabled(NbtCompound nbt) {
-        if (nbt == null) return false;
-
-        for (String blacklisted_nbt : ItemObliterator.Config.blacklisted_nbt) {
-            if (blacklisted_nbt == null) continue;
-            if (blacklisted_nbt.startsWith("//")) continue;
-
-            String nbtString = nbt.toString();
-
-            if (nbtString.contains(blacklisted_nbt)) return true;
-
-            if (blacklisted_nbt.startsWith("!")) {
-                blacklisted_nbt = blacklisted_nbt.substring(1);
-
-                if (nbtString.matches(blacklisted_nbt)) return true;
-            }
-        }
-        
-        return false;
-    }
-
-    public static boolean isDisabledInteract(String itemid) {
-        for (String blacklisted_id : ItemObliterator.Config.only_disable_interactions) {
-            if (blacklisted_id == null) continue;
-            if (blacklisted_id.startsWith("//")) continue;
-            
-            if (blacklisted_id.equals(itemid)) return true;
-
-            if (blacklisted_id.startsWith("!")) {
-                blacklisted_id = blacklisted_id.substring(1);
-
-                if (itemid.matches(blacklisted_id)) return true;
-            }
-        }
-        
-        return false;
-    }
-
-    public static boolean isDisabledInteract(ItemStack stack) {
-        if (stack == null) return false;
-
-        return isDisabledInteract(getItemId(stack.getItem()));
-    }
-
-    public static boolean isDisabledAttack(String itemid) {
-        for (String blacklisted_id : ItemObliterator.Config.only_disable_attacks) {
-            if (blacklisted_id == null) continue;
-            if (blacklisted_id.startsWith("//")) continue;
-            
-            if (blacklisted_id.equals(itemid)) return true;
-
-            if (blacklisted_id.startsWith("!")) {
-                blacklisted_id = blacklisted_id.substring(1);
-
-                if (itemid.matches(blacklisted_id)) return true;
-            }
-        }
-        
-        return false;
-    }
+	public static void reloadConfigHashsets() {
+		blacklisted_items = new HashSet<>(ItemObliterator.Config.blacklisted_items);
+		blacklisted_nbt = new HashSet<>(ItemObliterator.Config.blacklisted_nbt);
+		only_disable_interactions = new HashSet<>(ItemObliterator.Config.only_disable_interactions);
+		only_disable_attacks = new HashSet<>(ItemObliterator.Config.only_disable_attacks);
+		only_disable_recipes = new HashSet<>(ItemObliterator.Config.only_disable_recipes);
+	}
 }
